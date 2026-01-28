@@ -1,0 +1,374 @@
+---
+SPDX-License-Identifier: MIT
+path: "/tutorials/install-clawdbot-on-hetzner-vps"
+slug: "install-clawdbot-on-hetzner-vps"
+date: "2026-01-27"
+title: "Installing ClawdBot on a Hetzner Cloud Server"
+short_description: "This tutorial explains how to install ClawdBot, a self-hosted AI assistant, on an Ubuntu server and access it via Telegram, WhatsApp, or other platforms."
+tags: ["ClawdBot", "AI", "Docker", "Ubuntu", "Telegram", "WhatsApp"]
+author: "Nick Shilov"
+author_link: "https://github.com/gauss2302"
+author_img: "https://avatars.githubusercontent.com/u/gauss2302"
+author_description: "Developer and AI enthusiast"
+language: "en"
+available_languages: ["en"]
+header_img: "header-x"
+cta: "cloud"
+---
+
+-
+## Introduction
+
+ClawdBot is a self-hosted AI assistant that runs continuously on a server.
+
+Once installed, you can interact with it via popular messaging platforms like Telegram, WhatsApp, Discord, and Slack.
+
+This makes it possible to access your AI assistant from any device, anywhere. And you don't need to own a Mac Mini to test it out, just an ordinal cheap VPS will be enough to try it out.
+
+
+This tutorial covers two installation methods:
+
+- **npm installation** — Recommended for beginners and quick setups
+- **Docker installation** — Recommended for production deployments with persistent state
+
+By the end of this tutorial, you will have a running ClawdBot instance that you can access through your preferred messaging platform.
+I will try to support you in this beginner frieldnly set up.
+
+**Prerequisites**
+
+- A Hetzner Cloud server with Ubuntu 24.04
+- Basic knowledge of Linux command line
+- An AI model provider account:
+  - Anthropic API key or Claude Code subscription, or
+  - OpenAI API key, or
+  - Another [supported provider](https://docs.clawd.bot/providers)
+
+**Example terminology**
+
+This tutorial uses the following example values:
+
+- Username: `holu`
+- Server IP: `<10.0.0.1>`
+- Gateway port: `18789`
+
+Replace these with your actual values where necessary.
+
+## Step 1 - Create a Cloud Server
+
+Log into the [Hetzner Cloud Console](https://console.hetzner.cloud/) and create a new server with the following configuration:
+
+| Setting | Value |
+|---------|-------|
+| Location | Your preferred location |
+| Image | Ubuntu 24.04 |
+| Type | CX22 (2 vCPU, 4 GB RAM) |
+| Networking | Public IPv4 enabled |
+| SSH Key | Your public SSH key |
+
+Click **CREATE & BUY NOW** and note the server's IP address.
+
+> The CX22 instance provides sufficient resources for ClawdBot. For browser automation skills, consider a server with at least 4 GB RAM.
+
+## Step 2 - Connect to the Server
+
+Connect to your server via SSH:
+
+```bash
+ssh root@<10.0.0.1>
+```
+
+Update the system packages:
+
+```bash
+apt update && apt upgrade -y
+```
+
+If prompted to reboot, run `reboot` and reconnect after approximately 30 seconds.
+
+## Step 3 - Create a Dedicated User
+
+It's a bad taste to run everything from the root so we need to create a new user for running ClawdBot:
+
+```bash
+adduser agent
+```
+
+Set a strong password when prompted. You can skip the other fields by pressing Enter.
+
+Add the user to the sudo group:
+
+```bash
+usermod -aG sudo agent
+```
+
+Switch to the new user:
+
+```bash
+su - agent
+```
+
+## Step 4 - Install Node.js
+
+Install nvm (Node Version Manager):
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+```
+
+Load nvm into the current session:
+
+```bash
+\. "$HOME/.nvm/nvm.sh"
+```
+
+Install Node.js:
+
+```bash
+nvm install 24
+```
+
+Verify the installation:
+
+```bash
+node -v
+npm -v
+```
+
+Expected output:
+
+```
+v24.13.0
+11.6.2
+```
+
+## Step 5 - Install Homebrew
+
+It's not a must but some ClawdBot skills require Homebrew. Install it with:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Don't forget to add Homebrew to your PATH:
+
+```bash
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+```
+
+## Step 6 - Install ClawdBot
+
+And now, we are ready to install ClawdBot globally:
+
+```bash
+npm i -g clawdbot
+```
+
+## Step 7 - Configure ClawdBot
+
+Run the onboarding wizard:
+
+```bash
+clawdbot onboard
+```
+
+The wizard will guide you through the configuration. Use the following recommended settings:
+
+| Prompt | Setting |
+|--------|---------|
+| Continue? | Yes |
+| Onboarding mode | Manual |
+| What do you want to set up? | Local gateway (this machine) |
+| Workspace directory | `/home/holu/clawd` |
+| Model/auth provider | Your preferred provider |
+| Gateway port | `18789` |
+| Gateway bind | Loopback (127.0.0.1) |
+| Gateway auth | Token |
+| Configure chat channels now? | Yes |
+| Configure skills now? | Yes |
+| Node manager | npm |
+| Install Gateway service | Yes |
+| Gateway service runtime | Node |
+| How to hatch? | Hatch in TUI |
+
+Save the gateway token displayed during setup. You will need it to access the dashboard.
+
+## Step 8 - Set Up Telegram (Optional)
+
+To connect ClawdBot to Telegram:
+
+1. Open Telegram and message [@BotFather](https://t.me/BotFather)
+2. Send `/newbot` and follow the prompts
+3. Copy the bot token
+4. Enter the token when prompted during ClawdBot onboarding
+
+After the gateway starts, message your bot with `/start` to complete the pairing.
+
+## Step 9 - Access the Dashboard
+
+The dashboard is only accessible via localhost for security. Create an SSH tunnel from your local machine:
+
+```bash
+ssh -N -L 18789:127.0.0.1:18789 holu@<10.0.0.1>
+```
+
+Open your browser and navigate to:
+
+```
+http://127.0.0.1:18789
+```
+
+Enter your gateway token to access the dashboard.
+
+## Step 10 - Docker Installation (Optional)
+
+For production deployments, Docker provides better persistence and easier management.
+
+### Step 10.1 - Install Docker
+
+Connect as root and install Docker:
+
+```bash
+apt-get update
+apt-get install -y git curl ca-certificates
+curl -fsSL https://get.docker.com | sh
+```
+
+Verify the installation:
+
+```bash
+docker --version
+docker compose version
+```
+
+### Step 10.2 - Set Up the Project
+
+Clone the repository and create directories:
+
+```bash
+git clone https://github.com/clawdbot/clawdbot.git
+cd clawdbot
+
+mkdir -p /root/.clawdbot /root/clawd
+chown -R 1000:1000 /root/.clawdbot /root/clawd
+```
+
+### Step 10.3 - Create Environment File
+
+Generate secure tokens and create the `.env` file:
+
+```bash
+GATEWAY_TOKEN=$(openssl rand -hex 32)
+KEYRING_PASSWORD=$(openssl rand -hex 32)
+
+cat > .env << EOF
+CLAWDBOT_IMAGE=clawdbot:latest
+CLAWDBOT_GATEWAY_TOKEN=$GATEWAY_TOKEN
+CLAWDBOT_GATEWAY_BIND=lan
+CLAWDBOT_GATEWAY_PORT=18789
+CLAWDBOT_CONFIG_DIR=/root/.clawdbot
+CLAWDBOT_WORKSPACE_DIR=/root/clawd
+GOG_KEYRING_PASSWORD=$KEYRING_PASSWORD
+XDG_CONFIG_HOME=/home/node/.clawdbot
+EOF
+
+echo "Gateway token: $GATEWAY_TOKEN"
+```
+
+Save the gateway token securely.
+
+### Step 10.4 - Create Docker Compose File
+
+Create `docker-compose.yml` with the following content:
+
+```yaml
+services:
+  clawdbot-gateway:
+    image: ${CLAWDBOT_IMAGE}
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - HOME=/home/node
+      - NODE_ENV=production
+      - TERM=xterm-256color
+      - CLAWDBOT_GATEWAY_BIND=${CLAWDBOT_GATEWAY_BIND}
+      - CLAWDBOT_GATEWAY_PORT=${CLAWDBOT_GATEWAY_PORT}
+      - CLAWDBOT_GATEWAY_TOKEN=${CLAWDBOT_GATEWAY_TOKEN}
+      - GOG_KEYRING_PASSWORD=${GOG_KEYRING_PASSWORD}
+      - XDG_CONFIG_HOME=${XDG_CONFIG_HOME}
+      - PATH=/home/linuxbrew/.linuxbrew/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    volumes:
+      - ${CLAWDBOT_CONFIG_DIR}:/home/node/.clawdbot
+      - ${CLAWDBOT_WORKSPACE_DIR}:/home/node/clawd
+    ports:
+      - "127.0.0.1:${CLAWDBOT_GATEWAY_PORT}:18789"
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "gateway-daemon",
+        "--bind",
+        "${CLAWDBOT_GATEWAY_BIND}",
+        "--port",
+        "${CLAWDBOT_GATEWAY_PORT}"
+      ]
+```
+
+### Step 10.5 - Build and Start
+
+Build and start the container:
+
+```bash
+docker compose build
+docker compose up -d clawdbot-gateway
+```
+
+Check the logs:
+
+```bash
+docker compose logs -f clawdbot-gateway
+```
+
+You should see:
+
+```
+[gateway] listening on ws://0.0.0.0:18789
+```
+
+## Step 11 - Manage ClawdBot
+
+Use these commands to manage your ClawdBot installation:
+
+**npm installation:**
+
+| Command | Description |
+|---------|-------------|
+| `clawdbot status` | Check gateway status |
+| `clawdbot health` | Run health check |
+| `clawdbot logs` | View logs |
+| `clawdbot doctor` | Run diagnostics |
+| `clawdbot update` | Update ClawdBot |
+
+**Docker installation:**
+
+| Command | Description |
+|---------|-------------|
+| `docker compose logs -f clawdbot-gateway` | View logs |
+| `docker compose restart clawdbot-gateway` | Restart container |
+| `docker compose down` | Stop container |
+| `docker compose up -d` | Start container |
+
+## Conclusion
+
+You have successfully installed ClawdBot on your Hetzner Cloud server. Your AI assistant is now running 24/7 and accessible through your configured messaging platforms.
+
+The following data persists across restarts:
+
+| Component | Location |
+|-----------|----------|
+| Configuration | `~/.clawdbot/` |
+| Auth tokens | `~/.clawdbot/` |
+| WhatsApp session | `~/.clawdbot/` |
+| Workspace | `~/clawd/` |
